@@ -477,7 +477,7 @@ export default function HunterDashboard() {
   }, [mode, cfg, center]);
 
   const handleRecenter = () => {
-    setIsFollowingRobot(true);
+    //setIsFollowingRobot(true);
     mapRef.current?.recenter();
   };
 
