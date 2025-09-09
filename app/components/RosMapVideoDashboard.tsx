@@ -132,34 +132,75 @@ const Button = ({
 };
 
 // --- Complex Components ---
+// Find this component in your file and replace it completely with the code below.
+
 const CameraFeed = ({ src, alt, placeholder }) => {
   const [hasError, setHasError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const imgRef = useRef(null);
+
   useEffect(() => {
-    setHasError(false);
+    // If we don't have an image element ref or a src, do nothing.
+    if (!imgRef.current) return;
+    const imageElement = imgRef.current;
+
+    const handleLoad = () => {
+      setIsLoading(false);
+      setHasError(false);
+    };
+
+    const handleError = () => {
+      setIsLoading(false);
+      setHasError(true);
+    };
+
+    // Every time the src prop changes, we reset the state and attach our listeners.
     setIsLoading(true);
-  }, [src]);
+    setHasError(false);
+
+    // Attach event listeners FIRST. This is the crucial step.
+    imageElement.addEventListener("load", handleLoad);
+    imageElement.addEventListener("error", handleError);
+
+    // Set the src attribute LAST. This tells the browser to start loading.
+    // Because the listeners are already attached, we can't miss the event.
+    if (src) {
+      imageElement.src = src;
+    } else {
+      // If no src is provided, treat it as an error/unavailable state.
+      handleError();
+    }
+
+    // Cleanup function: remove the event listeners when the component unmounts
+    // or when the src changes and the effect re-runs.
+    return () => {
+      imageElement.removeEventListener("load", handleLoad);
+      imageElement.removeEventListener("error", handleError);
+    };
+  }, [src]); // This effect re-runs ONLY when the `src` prop changes.
+
   return (
     <div className="w-full h-full relative bg-gradient-to-r from-black via-gray-900 to-black">
-      {!hasError && src ? (
-        <img
-          src={src}
-          alt={alt}
-          className="w-full h-full object-contain"
-          onLoad={() => setIsLoading(false)}
-          onError={() => {
-            setHasError(true);
-            setIsLoading(false);
-          }}
-        />
-      ) : (
+      {/* The placeholder/error view */}
+      {(hasError || !src) && (
         <div className="w-full h-full flex flex-col items-center justify-center text-gray-300">
           <Camera size={48} className="mb-4 opacity-60" />
           <div className="text-sm font-medium mb-2">{placeholder}</div>
           <div className="text-xs opacity-80">No video stream available</div>
         </div>
       )}
-      {isLoading && !hasError && (
+
+      {/* The image element itself. Note it no longer has src, onLoad, or onError props. */}
+      <img
+        ref={imgRef}
+        alt={alt}
+        className={`w-full h-full object-contain ${
+          isLoading || hasError ? "hidden" : "visible" // Hide img until it's loaded
+        }`}
+      />
+
+      {/* The loading indicator view */}
+      {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-r from-black via-gray-900 to-black">
           <div className="text-gray-300 text-sm">Loading...</div>
         </div>
