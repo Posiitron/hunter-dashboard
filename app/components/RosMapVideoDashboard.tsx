@@ -231,7 +231,7 @@ const MapArea = forwardRef(
       return () => {
         try {
           document.head.removeChild(link);
-        } catch {}
+        } catch { }
       };
     }, []);
 
@@ -355,7 +355,7 @@ export default function HunterDashboard() {
       } else {
         await document.exitFullscreen();
       }
-    } catch {}
+    } catch { }
   };
 
   const [cfg, setCfg] = useState({
@@ -496,9 +496,8 @@ export default function HunterDashboard() {
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <div className="flex items-center gap-2 min-w-0">
               <div
-                className={`w-2 h-2 rounded-full ${
-                  rosConnected ? "bg-green-500" : "bg-red-500"
-                }`}
+                className={`w-2 h-2 rounded-full ${rosConnected ? "bg-green-500" : "bg-red-500"
+                  }`}
               />
               <span className="text-xs sm:text-sm font-medium text-white truncate">
                 {rosConnected ? "Connected" : "Disconnected"}
@@ -518,8 +517,8 @@ export default function HunterDashboard() {
                 <span className="font-mono tabular-nums text-white text-sm truncate">
                   {robotPosition
                     ? `${robotPosition[1].toFixed(
-                        6
-                      )}, ${robotPosition[0].toFixed(6)}`
+                      6
+                    )}, ${robotPosition[0].toFixed(6)}`
                     : "—, —"}
                 </span>
               </div>
@@ -603,33 +602,30 @@ export default function HunterDashboard() {
             <button
               onClick={() => setMapStyleKey("dark")}
               title="Dark Mode"
-              className={`px-2 py-1.5 transition-colors ${
-                mapStyleKey === "dark"
+              className={`px-2 py-1.5 transition-colors ${mapStyleKey === "dark"
                   ? "bg-white text-black"
                   : "bg-black text-gray-400 hover:text-white"
-              }`}
+                }`}
             >
               <Globe size={14} />
             </button>
             <button
               onClick={() => setMapStyleKey("street")}
               title="Street View"
-              className={`px-2 py-1.5 transition-colors ${
-                mapStyleKey === "street"
+              className={`px-2 py-1.5 transition-colors ${mapStyleKey === "street"
                   ? "bg-white text-black"
                   : "bg-black text-gray-400 hover:text-white"
-              }`}
+                }`}
             >
               <MapIcon size={14} />
             </button>
             <button
               onClick={() => setMapStyleKey("satellite")}
               title="Satellite View"
-              className={`px-2 py-1.5 transition-colors ${
-                mapStyleKey === "satellite"
+              className={`px-2 py-1.5 transition-colors ${mapStyleKey === "satellite"
                   ? "bg-white text-black"
                   : "bg-black text-gray-400 hover:text-white"
-              }`}
+                }`}
             >
               <Satellite size={14} />
             </button>
@@ -637,11 +633,10 @@ export default function HunterDashboard() {
         </Card>
 
         <Card
-          className={`absolute overflow-hidden transition-all duration-300 ${
-            cameraExpanded
+          className={`absolute overflow-hidden transition-all duration-300 ${cameraExpanded
               ? "top-4 left-4 right-4 bottom-4 z-30"
               : "bottom-2 right-2 w-[320px] sm:w-[360px] lg:w-[400px] h-[200px] sm:h-[220px] lg:h-[240px]"
-          }`}
+            }`}
         >
           <div className="flex items-center justify-between px-3 py-2 border-b border-gray-800">
             <div className="flex items-center gap-2">
@@ -657,31 +652,28 @@ export default function HunterDashboard() {
               <div className="flex rounded-md border border-gray-800 overflow-hidden">
                 <button
                   onClick={() => setSelectedCamera("front")}
-                  className={`px-2 py-1 text-xs transition-colors ${
-                    selectedCamera === "front"
+                  className={`px-2 py-1 text-xs transition-colors ${selectedCamera === "front"
                       ? "bg-white text-black"
                       : "bg-black text-gray-400 hover:text-white"
-                  }`}
+                    }`}
                 >
                   Front
                 </button>
                 <button
                   onClick={() => setSelectedCamera("rear")}
-                  className={`px-2 py-1 text-xs transition-colors ${
-                    selectedCamera === "rear"
+                  className={`px-2 py-1 text-xs transition-colors ${selectedCamera === "rear"
                       ? "bg-white text-black"
                       : "bg-black text-gray-400 hover:text-white"
-                  }`}
+                    }`}
                 >
                   Rear
                 </button>
                 <button
                   onClick={() => setSelectedCamera("both")}
-                  className={`px-2 py-1 text-xs transition-colors ${
-                    selectedCamera === "both"
+                  className={`px-2 py-1 text-xs transition-colors ${selectedCamera === "both"
                       ? "bg-white text-black"
                       : "bg-black text-gray-400 hover:text-white"
-                  }`}
+                    }`}
                 >
                   Both
                 </button>
@@ -699,52 +691,52 @@ export default function HunterDashboard() {
               </Button>
             </div>
           </div>
-          <div className="relative h-[calc(100%-40px)] bg-gradient-to-r from-black via-gray-900 to-black">
-            {selectedCamera === "both" ? (
-              <div className="flex h-full">
-                <div className="w-1/2 h-full border-r border-gray-800 relative">
-                  <div className="absolute top-2 left-2 z-10">
-                    <Badge color="bg-gray-200">Front</Badge>
-                  </div>
-                  <CameraFeed
-                    src={cfg.frontCameraUrl}
-                    alt="front camera"
-                    placeholder="Front Camera Unavailable"
-                  />
-                </div>
-                <div className="w-1/2 h-full relative">
-                  <div className="absolute top-2 left-2 z-10">
-                    <Badge color="bg-gray-200">Rear</Badge>
-                  </div>
-                  <CameraFeed
-                    src={cfg.rearCameraUrl}
-                    alt="rear camera"
-                    placeholder="Rear Camera Unavailable"
-                  />
-                </div>
+          <div className="relative flex h-[calc(100%-40px)] bg-gradient-to-r from-black via-gray-900 to-black">
+            {/* Front Camera Feed */}
+            <div
+              className={`relative h-full transition-all duration-300 ${selectedCamera === "both"
+                  ? "w-1/2 border-r border-gray-800"
+                  : selectedCamera === "front"
+                    ? "w-full"
+                    : "w-0 overflow-hidden"
+                }`}
+            >
+              <div className="absolute top-2 left-2 z-10">
+                <Badge color="bg-gray-200">Front</Badge>
               </div>
-            ) : (
               <CameraFeed
-                src={
-                  selectedCamera === "front"
-                    ? cfg.frontCameraUrl
-                    : cfg.rearCameraUrl
-                }
-                alt={`${selectedCamera} camera`}
-                placeholder={`${
-                  selectedCamera === "front" ? "Front" : "Rear"
-                } Camera Unavailable`}
+                src={cfg.frontCameraUrl}
+                alt="front camera"
+                placeholder="Front Camera Unavailable"
               />
-            )}
+            </div>
+
+            {/* Rear Camera Feed */}
+            <div
+              className={`relative h-full transition-all duration-300 ${selectedCamera === "both"
+                  ? "w-1/2"
+                  : selectedCamera === "rear"
+                    ? "w-full"
+                    : "w-0 overflow-hidden"
+                }`}
+            >
+              <div className="absolute top-2 left-2 z-10">
+                <Badge color="bg-gray-200">Rear</Badge>
+              </div>
+              <CameraFeed
+                src={cfg.rearCameraUrl}
+                alt="rear camera"
+                placeholder="Rear Camera Unavailable"
+              />
+            </div>
           </div>
         </Card>
 
         <Card
-          className={`absolute transition-all duration-300 ${
-            statusExpanded
+          className={`absolute transition-all duration-300 ${statusExpanded
               ? "top-4 left-4 right-4 bottom-4 z-30 p-4"
               : "bottom-2 left-2 w-[320px] sm:w-[360px] lg:w-[400px] h-[200px] sm:h-[220px] lg:h-[240px] p-3"
-          } overflow-hidden`}
+            } overflow-hidden`}
         >
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
@@ -766,11 +758,10 @@ export default function HunterDashboard() {
             </Button>
           </div>
           <div
-            className={`grid ${
-              statusExpanded
+            className={`grid ${statusExpanded
                 ? "grid-cols-3 sm:grid-cols-6 md:grid-cols-9 gap-3"
                 : "grid-cols-3 gap-3"
-            } mb-3 text-sm`}
+              } mb-3 text-sm`}
           >
             <div className="text-center">
               <div className="text-gray-400 text-xs mb-1">Control</div>
