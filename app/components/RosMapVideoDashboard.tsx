@@ -194,9 +194,8 @@ const CameraFeed = ({ src, alt, placeholder }) => {
       <img
         ref={imgRef}
         alt={alt}
-        className={`w-full h-full object-contain ${
-          isLoading || hasError ? "hidden" : "visible" // Hide img until it's loaded
-        }`}
+        className={`w-full h-full object-contain ${isLoading || hasError ? "hidden" : "visible" // Hide img until it's loaded
+          }`}
       />
 
       {/* The loading indicator view */}
@@ -405,10 +404,7 @@ export default function HunterDashboard() {
       "http://192.168.50.10:8080/stream?topic=/camera/camera1/color/image_raw",
     rearCameraUrl:
       "http://192.168.50.10:8080/stream?topic=/camera/camera2/color/image_raw",
-    odomTopic: "/odom",
     pathTopic: "/plan",
-    gpsTopic: "/fix",
-    useGps: false,
   });
   useEffect(() => {
     const base = httpBaseFromWs(cfg.rosbridgeUrl);
@@ -498,21 +494,23 @@ export default function HunterDashboard() {
       setStatus(message);
     });
 
-    const odomListener = new ROSLIB.Topic({
+    const gpsListener = new ROSLIB.Topic({
       ros: ros,
-      name: cfg.useGps ? cfg.gpsTopic : cfg.odomTopic,
-      messageType: "nav_msgs/Odometry", // Assuming odom for simplicity, GPS would need a different message type and logic
+      name: "/gnss/septentrio/raw/fix", // Hardcoded topic name
+      messageType: "sensor_msgs/NavSatFix", // The correct message type
     });
 
-    odomListener.subscribe((message) => {
-      const { x, y } = message.pose.pose.position;
-      const pt = enuToLngLat(x, y, center);
-      setRobotPosition(pt);
+    gpsListener.subscribe((message) => {
+      // Directly use latitude and longitude from the message
+      if (message.latitude != null && message.longitude != null) {
+        const pt = [message.longitude, message.latitude];
+        setRobotPosition(pt);
+      }
     });
 
     return () => {
       statusListener.unsubscribe();
-      odomListener.unsubscribe();
+      gpsListener.unsubscribe(); // Make sure to unsubscribe from the new listener
       ros.close();
     };
   }, [mode, cfg, center]);
@@ -644,8 +642,8 @@ export default function HunterDashboard() {
               onClick={() => setMapStyleKey("dark")}
               title="Dark Mode"
               className={`px-2 py-1.5 transition-colors ${mapStyleKey === "dark"
-                  ? "bg-white text-black"
-                  : "bg-black text-gray-400 hover:text-white"
+                ? "bg-white text-black"
+                : "bg-black text-gray-400 hover:text-white"
                 }`}
             >
               <Globe size={14} />
@@ -654,8 +652,8 @@ export default function HunterDashboard() {
               onClick={() => setMapStyleKey("street")}
               title="Street View"
               className={`px-2 py-1.5 transition-colors ${mapStyleKey === "street"
-                  ? "bg-white text-black"
-                  : "bg-black text-gray-400 hover:text-white"
+                ? "bg-white text-black"
+                : "bg-black text-gray-400 hover:text-white"
                 }`}
             >
               <MapIcon size={14} />
@@ -664,8 +662,8 @@ export default function HunterDashboard() {
               onClick={() => setMapStyleKey("satellite")}
               title="Satellite View"
               className={`px-2 py-1.5 transition-colors ${mapStyleKey === "satellite"
-                  ? "bg-white text-black"
-                  : "bg-black text-gray-400 hover:text-white"
+                ? "bg-white text-black"
+                : "bg-black text-gray-400 hover:text-white"
                 }`}
             >
               <Satellite size={14} />
@@ -675,8 +673,8 @@ export default function HunterDashboard() {
 
         <Card
           className={`absolute overflow-hidden transition-all duration-300 ${cameraExpanded
-              ? "top-4 left-4 right-4 bottom-4 z-30"
-              : "bottom-2 right-2 w-[320px] sm:w-[360px] lg:w-[400px] h-[200px] sm:h-[220px] lg:h-[240px]"
+            ? "top-4 left-4 right-4 bottom-4 z-30"
+            : "bottom-2 right-2 w-[320px] sm:w-[360px] lg:w-[400px] h-[200px] sm:h-[220px] lg:h-[240px]"
             }`}
         >
           <div className="flex items-center justify-between px-3 py-2 border-b border-gray-800">
@@ -694,8 +692,8 @@ export default function HunterDashboard() {
                 <button
                   onClick={() => setSelectedCamera("front")}
                   className={`px-2 py-1 text-xs transition-colors ${selectedCamera === "front"
-                      ? "bg-white text-black"
-                      : "bg-black text-gray-400 hover:text-white"
+                    ? "bg-white text-black"
+                    : "bg-black text-gray-400 hover:text-white"
                     }`}
                 >
                   Front
@@ -703,8 +701,8 @@ export default function HunterDashboard() {
                 <button
                   onClick={() => setSelectedCamera("rear")}
                   className={`px-2 py-1 text-xs transition-colors ${selectedCamera === "rear"
-                      ? "bg-white text-black"
-                      : "bg-black text-gray-400 hover:text-white"
+                    ? "bg-white text-black"
+                    : "bg-black text-gray-400 hover:text-white"
                     }`}
                 >
                   Rear
@@ -712,8 +710,8 @@ export default function HunterDashboard() {
                 <button
                   onClick={() => setSelectedCamera("both")}
                   className={`px-2 py-1 text-xs transition-colors ${selectedCamera === "both"
-                      ? "bg-white text-black"
-                      : "bg-black text-gray-400 hover:text-white"
+                    ? "bg-white text-black"
+                    : "bg-black text-gray-400 hover:text-white"
                     }`}
                 >
                   Both
@@ -736,10 +734,10 @@ export default function HunterDashboard() {
             {/* Front Camera Feed */}
             <div
               className={`relative h-full transition-all duration-300 ${selectedCamera === "both"
-                  ? "w-1/2 border-r border-gray-800"
-                  : selectedCamera === "front"
-                    ? "w-full"
-                    : "w-0 overflow-hidden"
+                ? "w-1/2 border-r border-gray-800"
+                : selectedCamera === "front"
+                  ? "w-full"
+                  : "w-0 overflow-hidden"
                 }`}
             >
               <div className="absolute top-2 left-2 z-10">
@@ -755,10 +753,10 @@ export default function HunterDashboard() {
             {/* Rear Camera Feed */}
             <div
               className={`relative h-full transition-all duration-300 ${selectedCamera === "both"
-                  ? "w-1/2"
-                  : selectedCamera === "rear"
-                    ? "w-full"
-                    : "w-0 overflow-hidden"
+                ? "w-1/2"
+                : selectedCamera === "rear"
+                  ? "w-full"
+                  : "w-0 overflow-hidden"
                 }`}
             >
               <div className="absolute top-2 left-2 z-10">
@@ -775,8 +773,8 @@ export default function HunterDashboard() {
 
         <Card
           className={`absolute transition-all duration-300 ${statusExpanded
-              ? "top-4 left-4 right-4 bottom-4 z-30 p-4"
-              : "bottom-2 left-2 w-[320px] sm:w-[360px] lg:w-[400px] h-[200px] sm:h-[220px] lg:h-[240px] p-3"
+            ? "top-4 left-4 right-4 bottom-4 z-30 p-4"
+            : "bottom-2 left-2 w-[320px] sm:w-[360px] lg:w-[400px] h-[200px] sm:h-[220px] lg:h-[240px] p-3"
             } overflow-hidden`}
         >
           <div className="flex items-center justify-between mb-3">
@@ -800,8 +798,8 @@ export default function HunterDashboard() {
           </div>
           <div
             className={`grid ${statusExpanded
-                ? "grid-cols-3 sm:grid-cols-6 md:grid-cols-9 gap-3"
-                : "grid-cols-3 gap-3"
+              ? "grid-cols-3 sm:grid-cols-6 md:grid-cols-9 gap-3"
+              : "grid-cols-3 gap-3"
               } mb-3 text-sm`}
           >
             <div className="text-center">
@@ -982,28 +980,7 @@ export default function HunterDashboard() {
                         placeholder="ws://HOST:9090"
                       />
                     </Field>
-                    <Field label="Position Source">
-                      <div className="flex items-center gap-3 mb-2">
-                        <Checkbox
-                          checked={cfg.useGps}
-                          onChange={(v) => setCfg({ ...cfg, useGps: v })}
-                        />
-                        <span className="text-sm text-gray-400">
-                          Use GPS (NavSatFix)
-                        </span>
-                      </div>
-                      <TextInput
-                        value={cfg.useGps ? cfg.gpsTopic : cfg.odomTopic}
-                        onChange={(e) =>
-                          setCfg({
-                            ...cfg,
-                            [cfg.useGps ? "gpsTopic" : "odomTopic"]:
-                              e.target.value,
-                          })
-                        }
-                        placeholder={cfg.useGps ? "/fix" : "/odom"}
-                      />
-                    </Field>
+
                     <Field label="Path Planning Topic">
                       <TextInput
                         value={cfg.pathTopic}
