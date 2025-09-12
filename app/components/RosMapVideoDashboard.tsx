@@ -239,6 +239,8 @@ const AttributionControl = ({ text }) => {
   );
 };
 
+// Find this component in your file and replace it completely with the code below.
+
 const MapArea = forwardRef(
   (
     {
@@ -248,6 +250,7 @@ const MapArea = forwardRef(
       onUserInteraction,
       styleUrl,
       onAttributionChange,
+      path, // The path prop we added before
     },
     ref
   ) => {
@@ -271,7 +274,7 @@ const MapArea = forwardRef(
       return () => {
         try {
           document.head.removeChild(link);
-        } catch { }
+        } catch {}
       };
     }, []);
 
@@ -281,6 +284,7 @@ const MapArea = forwardRef(
         try {
           const maplibregl = (await import("maplibre-gl")).default;
           if (cancelled || !containerRef.current) return;
+
           const map = new maplibregl.Map({
             container: containerRef.current,
             style: styleUrl,
@@ -289,16 +293,32 @@ const MapArea = forwardRef(
             attributionControl: false,
           });
           mapState.current.map = map;
+
           map.on("dragstart", onUserInteraction);
+
+          // --- NEW: Load assets like our arrow icon when the map is ready ---
           map.on("load", () => {
             if (cancelled) return;
+
+            // Robot Marker
             const el = document.createElement("div");
             el.className =
               "w-3 h-3 bg-blue-400 rounded-full border-2 border-white shadow";
             mapState.current.marker = new maplibregl.Marker({ element: el })
               .setLngLat(robotPosition)
               .addTo(map);
+
+            // Directional Arrow SVG for the path
+            const arrowSvg = `<svg width="20" height="20" viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg"><path fill="#ff7c05" d="M5 0 L10 10 L5 7.5 L0 10 Z"></path></svg>`;
+            const arrowImg = new Image(20, 20);
+            arrowImg.src = "data:image/svg+xml;base64," + btoa(arrowSvg);
+
+            arrowImg.onload = () => {
+              if (map.hasImage("arrow-icon")) map.removeImage("arrow-icon");
+              map.addImage("arrow-icon", arrowImg, { sdf: true });
+            };
           });
+
           map.on("error", () => {
             if (!cancelled) setMapFailed(true);
           });
@@ -306,12 +326,12 @@ const MapArea = forwardRef(
           if (!cancelled) setMapFailed(true);
         }
       })();
+
       return () => {
         cancelled = true;
         mapState.current.map?.remove();
         mapState.current = { map: null, marker: null };
       };
-      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
@@ -341,6 +361,108 @@ const MapArea = forwardRef(
         }
       }
     }, [robotPosition, isFollowing]);
+
+    // --- NEW: This entire useEffect block handles drawing the styled path ---
+    useEffect(() => {
+      const map = mapState.current.map;
+      if (!map || !map.isStyleLoaded()) return;
+
+      const sourceIds = ['path-source', 'start-point-source', 'end-point-source'];
+      const layerIds = ['path-casing', 'path-line', 'path-arrows', 'start-point', 'end-point'];
+
+      // If the path is empty or too short, clear any existing path data from the map
+      if (!path || path.length < 2) {
+        sourceIds.forEach(id => {
+          const source = map.getSource(id);
+          if (source) {
+            source.setData({ type: 'FeatureCollection', features: [] });
+          }
+        });
+        return;
+      }
+      
+      const startPoint = path[0];
+      const endPoint = path[path.length - 1];
+
+      // Define the GeoJSON data for our path and its endpoints
+      const pathLineData = { type: 'Feature', geometry: { type: 'LineString', coordinates: path } };
+      const startPointData = { type: 'Feature', geometry: { type: 'Point', coordinates: startPoint } };
+      const endPointData = { type: 'Feature', geometry: { type: 'Point', coordinates: endPoint } };
+
+      // Update or create the sources and layers for the path
+      const setupSourceAndLayers = (sourceId, layerConfigs, data) => {
+        const source = map.getSource(sourceId);
+        if (source) {
+          source.setData(data);
+        } else {
+          map.addSource(sourceId, { type: 'geojson', data });
+          layerConfigs.forEach(config => map.addLayer(config));
+        }
+      };
+
+      // 1. Setup for the main path line
+      setupSourceAndLayers('path-source', [
+        { // The dark, thick "casing" underneath
+          id: 'path-casing',
+          type: 'line',
+          source: 'path-source',
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: { 'line-color': '#a13c00', 'line-width': 8, 'line-opacity': 0.4 }
+        },
+        { // The bright main line on top
+          id: 'path-line',
+          type: 'line',
+          source: 'path-source',
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: { 'line-color': '#ff7c05', 'line-width': 4 }
+        },
+        { // The directional arrows
+          id: 'path-arrows',
+          type: 'symbol',
+          source: 'path-source',
+          layout: {
+            'symbol-placement': 'line',
+            'symbol-spacing': 120,
+            'icon-image': 'arrow-icon',
+            'icon-size': 0.6,
+            'icon-allow-overlap': true,
+            'icon-ignore-placement': true,
+            'icon-rotation-alignment': 'map',
+            'icon-rotate': 90
+          },
+          paint: {
+            'icon-color': '#ffffff' // Tint the arrow icon
+          }
+        }
+      ], pathLineData);
+
+      // 2. Setup for the start point marker
+      setupSourceAndLayers('start-point-source', [{
+        id: 'start-point',
+        type: 'circle',
+        source: 'start-point-source',
+        paint: {
+          'circle-radius': 9,
+          'circle-color': '#22c55e', // Green
+          'circle-stroke-color': 'white',
+          'circle-stroke-width': 2
+        }
+      }], startPointData);
+
+      // 3. Setup for the end point marker
+      setupSourceAndLayers('end-point-source', [{
+        id: 'end-point',
+        type: 'circle',
+        source: 'end-point-source',
+        paint: {
+          'circle-radius': 9,
+          'circle-color': '#ef4444', // Red
+          'circle-stroke-color': 'white',
+          'circle-stroke-width': 2
+        }
+      }], endPointData);
+
+    }, [path]); // This hook runs whenever the path data changes
 
     if (mapFailed) return <MockMap />;
     return <div ref={containerRef} className="w-full h-full" />;
@@ -380,6 +502,7 @@ export default function HunterDashboard() {
   const [isFollowingRobot, setIsFollowingRobot] = useState(true);
   const [mapStyleKey, setMapStyleKey] = useState("dark");
   const [attributionText, setAttributionText] = useState("");
+  const [pathPoints, setPathPoints] = useState([]);
   const mapRef = useRef(null);
 
   const [isFs, setIsFs] = useState(false);
@@ -399,12 +522,12 @@ export default function HunterDashboard() {
   };
 
   const [cfg, setCfg] = useState({
-    rosbridgeUrl: "ws://192.168.50.10:9090",
+    rosbridgeUrl: "ws://10.10.3.103:9090",
     frontCameraUrl:
       "http://192.168.50.10:8080/stream?topic=/camera/camera1/color/image_raw",
     rearCameraUrl:
       "http://192.168.50.10:8080/stream?topic=/camera/camera2/color/image_raw",
-    pathTopic: "/plan",
+    pathTopic: "/gps/waypoints",
   });
   useEffect(() => {
     const base = httpBaseFromWs(cfg.rosbridgeUrl);
@@ -494,26 +617,46 @@ export default function HunterDashboard() {
       setStatus(message);
     });
 
+    // ... inside the useEffect for ROS connection
     const gpsListener = new ROSLIB.Topic({
       ros: ros,
-      name: "/gnss/septentrio/raw/fix", // Hardcoded topic name
-      messageType: "sensor_msgs/NavSatFix", // The correct message type
+      name: "/gnss/septentrio/raw/fix",
+      messageType: "sensor_msgs/NavSatFix",
     });
 
     gpsListener.subscribe((message) => {
-      // Directly use latitude and longitude from the message
       if (message.latitude != null && message.longitude != null) {
         const pt = [message.longitude, message.latitude];
         setRobotPosition(pt);
       }
     });
 
+    // --- ADD THIS NEW LISTENER ---
+    const pathListener = new ROSLIB.Topic({
+      ros: ros,
+      name: cfg.pathTopic,
+      // IMPORTANT: Replace with your actual message type from `ros2 topic info`
+      messageType: "artemis_msgs/msg/NavSatFixList",
+    });
+    pathListener.subscribe((message) => {
+      // Defensive check: Ensure the message and the 'fixes' array exist before processing.
+      if (message && Array.isArray(message.fixes)) {
+        const points = message.fixes.map(fix => [fix.longitude, fix.latitude]);
+        setPathPoints(points);
+      } else {
+        // Optional: Log when an invalid message is received, for debugging.
+        console.log("Received a message on /gps/waypoints without a valid 'fixes' array.");
+      }
+    });
+    // --- END OF NEW LISTENER ---
+
     return () => {
       statusListener.unsubscribe();
-      gpsListener.unsubscribe(); // Make sure to unsubscribe from the new listener
+      gpsListener.unsubscribe();
+      pathListener.unsubscribe(); // <-- ADD THIS LINE
       ros.close();
     };
-  }, [mode, cfg, center]);
+  }, [mode, cfg, center]); // The dependencies array does not need to change
 
   const handleRecenter = () => {
     //setIsFollowingRobot(true);
@@ -605,6 +748,7 @@ export default function HunterDashboard() {
           onUserInteraction={handleUserInteraction}
           styleUrl={mapStyles[mapStyleKey]}
           onAttributionChange={handleAttributionChange}
+          path={pathPoints}
         />
 
         <AttributionControl text={attributionText} />
