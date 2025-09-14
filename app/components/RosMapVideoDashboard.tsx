@@ -241,6 +241,8 @@ const AttributionControl = ({ text }) => {
 
 // Find this component in your file and replace it completely with the code below.
 
+// Find this component in your file and replace it completely with the code below.
+
 const MapArea = forwardRef(
   (
     {
@@ -250,7 +252,7 @@ const MapArea = forwardRef(
       onUserInteraction,
       styleUrl,
       onAttributionChange,
-      path, // The path prop we added before
+      path,
     },
     ref
   ) => {
@@ -274,7 +276,7 @@ const MapArea = forwardRef(
       return () => {
         try {
           document.head.removeChild(link);
-        } catch {}
+        } catch { }
       };
     }, []);
 
@@ -284,7 +286,6 @@ const MapArea = forwardRef(
         try {
           const maplibregl = (await import("maplibre-gl")).default;
           if (cancelled || !containerRef.current) return;
-
           const map = new maplibregl.Map({
             container: containerRef.current,
             style: styleUrl,
@@ -293,14 +294,10 @@ const MapArea = forwardRef(
             attributionControl: false,
           });
           mapState.current.map = map;
-
           map.on("dragstart", onUserInteraction);
 
-          // --- NEW: Load assets like our arrow icon when the map is ready ---
           map.on("load", () => {
             if (cancelled) return;
-
-            // Robot Marker
             const el = document.createElement("div");
             el.className =
               "w-3 h-3 bg-blue-400 rounded-full border-2 border-white shadow";
@@ -308,25 +305,27 @@ const MapArea = forwardRef(
               .setLngLat(robotPosition)
               .addTo(map);
 
-            // Directional Arrow SVG for the path
-            const arrowSvg = `<svg width="20" height="20" viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg"><path fill="#ff7c05" d="M5 0 L10 10 L5 7.5 L0 10 Z"></path></svg>`;
-            const arrowImg = new Image(20, 20);
-            arrowImg.src = "data:image/svg+xml;base64," + btoa(arrowSvg);
+            // --- NEW: Load custom SVG icons for the path endpoints ---
+            // We create SVG strings and convert them to image elements the map can use.
 
-            arrowImg.onload = () => {
-              if (map.hasImage("arrow-icon")) map.removeImage("arrow-icon");
-              map.addImage("arrow-icon", arrowImg, { sdf: true });
-            };
+            // Start Icon: A green PlayCircle
+            const startSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" fill="#22c55e"></circle><polygon points="10,8 16,12 10,16 10,8" fill="white" stroke="none"></polygon></svg>`;
+            const startImg = new Image(28, 28);
+            startImg.src = "data:image/svg+xml;base64," + btoa(startSvg);
+            startImg.onload = () => map.hasImage("start-icon") || map.addImage("start-icon", startImg, { sdf: false });
+
+            // End Icon: A red CheckCircle
+            const endSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" fill="#ef4444"></circle><path d="m9 12 2 2 4-4" stroke-width="2.5"></path></svg>`;
+            const endImg = new Image(28, 28);
+            endImg.src = "data:image/svg+xml;base64," + btoa(endSvg);
+            endImg.onload = () => map.hasImage("end-icon") || map.addImage("end-icon", endImg, { sdf: false });
           });
 
-          map.on("error", () => {
-            if (!cancelled) setMapFailed(true);
-          });
+          map.on("error", () => !cancelled && setMapFailed(true));
         } catch (e) {
           if (!cancelled) setMapFailed(true);
         }
       })();
-
       return () => {
         cancelled = true;
         mapState.current.map?.remove();
@@ -341,9 +340,7 @@ const MapArea = forwardRef(
       const updateAttribution = () => {
         if (!map.isStyleLoaded()) return;
         const sources = map.getStyle().sources;
-        const attributions = Object.values(sources)
-          .map((s) => s.attribution)
-          .filter(Boolean);
+        const attributions = Object.values(sources).map(s => s.attribution).filter(Boolean);
         onAttributionChange([...new Set(attributions)].join(" | "));
       };
       map.on("styledata", updateAttribution);
@@ -354,122 +351,100 @@ const MapArea = forwardRef(
       if (mapState.current.map && mapState.current.marker) {
         mapState.current.marker.setLngLat(robotPosition);
         if (isFollowing) {
-          mapState.current.map.panTo(robotPosition, {
-            duration: 500,
-            essential: true,
-          });
+          mapState.current.map.panTo(robotPosition, { duration: 500, essential: true });
         }
       }
     }, [robotPosition, isFollowing]);
 
-    // --- NEW: This entire useEffect block handles drawing the styled path ---
+    // --- UPDATED: Path drawing logic with robust updates and new styling ---
     useEffect(() => {
       const map = mapState.current.map;
       if (!map || !map.isStyleLoaded()) return;
 
+      const layerIds = ['path-casing', 'path-line', 'start-point', 'end-point'];
       const sourceIds = ['path-source', 'start-point-source', 'end-point-source'];
-      const layerIds = ['path-casing', 'path-line', 'path-arrows', 'start-point', 'end-point'];
 
-      // If the path is empty or too short, clear any existing path data from the map
-      if (!path || path.length < 2) {
-        sourceIds.forEach(id => {
-          const source = map.getSource(id);
-          if (source) {
-            source.setData({ type: 'FeatureCollection', features: [] });
-          }
+      // --- THE FIX: This function removes old layers and sources completely before drawing new ones.
+      // This prevents errors where the map's internal state doesn't match React's state.
+      const cleanupOldPath = () => {
+        layerIds.forEach(id => {
+          if (map.getLayer(id)) map.removeLayer(id);
         });
+        sourceIds.forEach(id => {
+          if (map.getSource(id)) map.removeSource(id);
+        });
+      };
+
+      cleanupOldPath();
+
+      // If the path is empty or too short, we stop here after cleaning up.
+      if (!path || path.length < 1) {
         return;
       }
-      
+
+      // Define GeoJSON data for the path line and its start/end points
       const startPoint = path[0];
       const endPoint = path[path.length - 1];
-
-      // Define the GeoJSON data for our path and its endpoints
       const pathLineData = { type: 'Feature', geometry: { type: 'LineString', coordinates: path } };
       const startPointData = { type: 'Feature', geometry: { type: 'Point', coordinates: startPoint } };
       const endPointData = { type: 'Feature', geometry: { type: 'Point', coordinates: endPoint } };
 
-      // Update or create the sources and layers for the path
-      const setupSourceAndLayers = (sourceId, layerConfigs, data) => {
-        const source = map.getSource(sourceId);
-        if (source) {
-          source.setData(data);
-        } else {
-          map.addSource(sourceId, { type: 'geojson', data });
-          layerConfigs.forEach(config => map.addLayer(config));
-        }
-      };
+      // Add the new sources
+      map.addSource('path-source', { type: 'geojson', data: pathLineData });
+      map.addSource('start-point-source', { type: 'geojson', data: startPointData });
+      map.addSource('end-point-source', { type: 'geojson', data: endPointData });
 
-      // 1. Setup for the main path line
-      setupSourceAndLayers('path-source', [
-        { // The dark, thick "casing" underneath
+      // Add the new layers with the modern styling
+      if (path.length > 1) {
+        map.addLayer({
           id: 'path-casing',
           type: 'line',
           source: 'path-source',
           layout: { 'line-join': 'round', 'line-cap': 'round' },
           paint: { 'line-color': '#a13c00', 'line-width': 8, 'line-opacity': 0.4 }
-        },
-        { // The bright main line on top
+        });
+        map.addLayer({
           id: 'path-line',
           type: 'line',
           source: 'path-source',
           layout: { 'line-join': 'round', 'line-cap': 'round' },
           paint: { 'line-color': '#ff7c05', 'line-width': 4 }
-        },
-        { // The directional arrows
-          id: 'path-arrows',
-          type: 'symbol',
-          source: 'path-source',
-          layout: {
-            'symbol-placement': 'line',
-            'symbol-spacing': 120,
-            'icon-image': 'arrow-icon',
-            'icon-size': 0.6,
-            'icon-allow-overlap': true,
-            'icon-ignore-placement': true,
-            'icon-rotation-alignment': 'map',
-            'icon-rotate': 90
-          },
-          paint: {
-            'icon-color': '#ffffff' // Tint the arrow icon
-          }
-        }
-      ], pathLineData);
+        });
+      }
 
-      // 2. Setup for the start point marker
-      setupSourceAndLayers('start-point-source', [{
+      // Start Point Layer (using the custom icon)
+      map.addLayer({
         id: 'start-point',
-        type: 'circle',
+        type: 'symbol',
         source: 'start-point-source',
-        paint: {
-          'circle-radius': 9,
-          'circle-color': '#22c55e', // Green
-          'circle-stroke-color': 'white',
-          'circle-stroke-width': 2
+        layout: {
+          'icon-image': 'start-icon',
+          'icon-size': 1,
+          'icon-allow-overlap': true
         }
-      }], startPointData);
+      });
 
-      // 3. Setup for the end point marker
-      setupSourceAndLayers('end-point-source', [{
-        id: 'end-point',
-        type: 'circle',
-        source: 'end-point-source',
-        paint: {
-          'circle-radius': 9,
-          'circle-color': '#ef4444', // Red
-          'circle-stroke-color': 'white',
-          'circle-stroke-width': 2
-        }
-      }], endPointData);
+      // End Point Layer (only if start and end are different)
+      if (path.length > 1) {
+        map.addLayer({
+          id: 'end-point',
+          type: 'symbol',
+          source: 'end-point-source',
+          layout: {
+            'icon-image': 'end-icon',
+            'icon-size': 1,
+            'icon-allow-overlap': true
+          }
+        });
+      }
 
-    }, [path]); // This hook runs whenever the path data changes
+    }, [path]); // This hook now reliably re-runs and re-draws when 'path' changes
 
     if (mapFailed) return <MockMap />;
     return <div ref={containerRef} className="w-full h-full" />;
   }
 );
 MapArea.displayName = "MapArea";
-
 const mapStyles = {
   dark: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
   street: "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json",
@@ -639,12 +614,16 @@ export default function HunterDashboard() {
       messageType: "artemis_msgs/msg/NavSatFixList",
     });
     pathListener.subscribe((message) => {
-      // Defensive check: Ensure the message and the 'fixes' array exist before processing.
       if (message && Array.isArray(message.fixes)) {
         const points = message.fixes.map(fix => [fix.longitude, fix.latitude]);
+
+        // --- DIAGNOSTIC LOG ---
+        // Log the first coordinate of the new path. If this value changes in your
+        // browser console when a new path is published, the ROS node is working correctly.
+        console.log("New path received. First waypoint:", points[0]);
+
         setPathPoints(points);
       } else {
-        // Optional: Log when an invalid message is received, for debugging.
         console.log("Received a message on /gps/waypoints without a valid 'fixes' array.");
       }
     });
