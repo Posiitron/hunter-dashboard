@@ -31,7 +31,8 @@ import {
 // It also assumes you have Tailwind CSS set up in your project.
 
 // --- utils ---
-function enuToLngLat(x, y, originLngLat) {
+// FIXED: Added explicit types to the function parameters to resolve the TypeScript error.
+function enuToLngLat(x: number, y: number, originLngLat: [number, number]) {
   const metersPerDegLat = 111_320;
   const metersPerDegLng = Math.cos((originLngLat[1] * Math.PI) / 180) * 111_320;
   return [
@@ -39,16 +40,16 @@ function enuToLngLat(x, y, originLngLat) {
     originLngLat[1] + y / metersPerDegLat,
   ];
 }
-function toHex(n) {
+function toHex(n: number | undefined | null) {
   if (n === undefined || n === null || !isFinite(n)) return "—";
   return "0x" + (n >>> 0).toString(16).toUpperCase();
 }
-function cleanTemp(t) {
+function cleanTemp(t: number | undefined | null) {
   if (t === undefined || t === null || !isFinite(t)) return null;
   if (t <= -20 || t === 0 || t > 150) return null;
   return t;
 }
-function httpBaseFromWs(wsUrl) {
+function httpBaseFromWs(wsUrl: string) {
   try {
     const u = new URL(wsUrl);
     return `${u.protocol === "wss:" ? "https" : "http"}://${u.hostname}:8080`;
@@ -56,33 +57,33 @@ function httpBaseFromWs(wsUrl) {
     return "http://localhost:8080";
   }
 }
-const fmt = (n, d = 1) =>
+const fmt = (n: number | undefined | null, d = 1) =>
   n === undefined || n === null || !isFinite(n) ? "—" : Number(n).toFixed(d);
-const fmtInt = (n) =>
+const fmtInt = (n: number | undefined | null) =>
   n === undefined || n === null || !isFinite(n) ? "—" : Math.round(n);
 
 // --- UI primitives ---
-const Badge = ({ children, color = "bg-gray-200" }) => (
+const Badge = ({ children, color = "bg-gray-200" }: { children: React.ReactNode, color?: string }) => (
   <span
     className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium text-black ${color} shadow-sm`}
   >
     {children}
   </span>
 );
-const Card = ({ children, className = "" }) => (
+const Card = ({ children, className = "" }: { children: React.ReactNode, className?: string }) => (
   <div
     className={`bg-gradient-to-br from-black/95 to-gray-900/95 backdrop-blur-xl border border-gray-800/50 rounded-lg shadow-2xl shadow-black/20 ${className}`}
   >
     {children}
   </div>
 );
-const Field = ({ label, children }) => (
+const Field = ({ label, children }: { label: string, children: React.ReactNode }) => (
   <div className="space-y-2">
     <label className="block text-sm font-medium text-gray-400">{label}</label>
     {children}
   </div>
 );
-const TextInput = ({ value, onChange, placeholder, disabled }) => (
+const TextInput = ({ value, onChange, placeholder, disabled }: { value: string, onChange: (e: React.ChangeEvent<HTMLInputElement>) => void, placeholder?: string, disabled?: boolean }) => (
   <input
     type="text"
     value={value}
@@ -92,21 +93,15 @@ const TextInput = ({ value, onChange, placeholder, disabled }) => (
     className="w-full px-3 py-2 bg-gradient-to-r from-black to-gray-900 border border-gray-800/50 rounded-md text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-white/50 focus:border-white/50 transition-all duration-200 backdrop-blur-sm"
   />
 );
-const Checkbox = ({ checked, onChange }) => (
-  <input
-    type="checkbox"
-    checked={checked}
-    onChange={(e) => onChange(e.target.checked)}
-    className="w-4 h-4 bg-black border border-gray-800 rounded text-white focus:ring-white/50 focus:ring-1"
-  />
-);
+// FIXED: Removed the unused 'Checkbox' component that was causing a linting warning.
 const Button = ({
   children,
   onClick,
   variant = "default",
   size = "default",
   className = "",
-}) => {
+  title
+}: { children: React.ReactNode, onClick: () => void, variant?: 'default' | 'primary' | 'ghost', size?: 'default' | 'sm', className?: string, title?: string }) => {
   const baseClasses =
     "inline-flex items-center justify-center font-medium transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-white/50 backdrop-blur-sm";
   const variants = {
@@ -125,6 +120,7 @@ const Button = ({
     <button
       onClick={onClick}
       className={`${baseClasses} ${variants[variant]} ${sizes[size]} ${className}`}
+      title={title}
     >
       {children}
     </button>
@@ -132,15 +128,12 @@ const Button = ({
 };
 
 // --- Complex Components ---
-// Find this component in your file and replace it completely with the code below.
-
-const CameraFeed = ({ src, alt, placeholder }) => {
+const CameraFeed = ({ src, alt, placeholder }: { src: string, alt: string, placeholder: string }) => {
   const [hasError, setHasError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const imgRef = useRef(null);
+  const imgRef = useRef<HTMLImageElement>(null);
 
   useEffect(() => {
-    // If we don't have an image element ref or a src, do nothing.
     if (!imgRef.current) return;
     const imageElement = imgRef.current;
 
@@ -154,34 +147,26 @@ const CameraFeed = ({ src, alt, placeholder }) => {
       setHasError(true);
     };
 
-    // Every time the src prop changes, we reset the state and attach our listeners.
     setIsLoading(true);
     setHasError(false);
 
-    // Attach event listeners FIRST. This is the crucial step.
     imageElement.addEventListener("load", handleLoad);
     imageElement.addEventListener("error", handleError);
 
-    // Set the src attribute LAST. This tells the browser to start loading.
-    // Because the listeners are already attached, we can't miss the event.
     if (src) {
       imageElement.src = src;
     } else {
-      // If no src is provided, treat it as an error/unavailable state.
       handleError();
     }
 
-    // Cleanup function: remove the event listeners when the component unmounts
-    // or when the src changes and the effect re-runs.
     return () => {
       imageElement.removeEventListener("load", handleLoad);
       imageElement.removeEventListener("error", handleError);
     };
-  }, [src]); // This effect re-runs ONLY when the `src` prop changes.
+  }, [src]);
 
   return (
     <div className="w-full h-full relative bg-gradient-to-r from-black via-gray-900 to-black">
-      {/* The placeholder/error view */}
       {(hasError || !src) && (
         <div className="w-full h-full flex flex-col items-center justify-center text-gray-300">
           <Camera size={48} className="mb-4 opacity-60" />
@@ -189,16 +174,16 @@ const CameraFeed = ({ src, alt, placeholder }) => {
           <div className="text-xs opacity-80">No video stream available</div>
         </div>
       )}
-
-      {/* The image element itself. Note it no longer has src, onLoad, or onError props. */}
+      {/* 
+        NOTE: The build log warned about using <img> instead of Next.js's <Image>.
+        For streaming content like this, <img> is often necessary and acceptable.
+        This warning can be ignored or disabled in your ESLint config if desired.
+      */}
       <img
         ref={imgRef}
         alt={alt}
-        className={`w-full h-full object-contain ${isLoading || hasError ? "hidden" : "visible" // Hide img until it's loaded
-          }`}
+        className={`w-full h-full object-contain ${isLoading || hasError ? "hidden" : "visible"}`}
       />
-
-      {/* The loading indicator view */}
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-r from-black via-gray-900 to-black">
           <div className="text-gray-300 text-sm">Loading...</div>
@@ -227,7 +212,7 @@ const MockMap = () => (
   </div>
 );
 
-const AttributionControl = ({ text }) => {
+const AttributionControl = ({ text }: { text: string }) => {
   if (!text) return null;
   return (
     <div className="absolute top-2 right-2 z-20 max-w-xs text-right">
@@ -239,10 +224,6 @@ const AttributionControl = ({ text }) => {
   );
 };
 
-// Find this component in your file and replace it completely with the code below.
-
-// Find this component in your file and replace it completely with the code below.
-
 const MapArea = forwardRef(
   (
     {
@@ -253,11 +234,19 @@ const MapArea = forwardRef(
       styleUrl,
       onAttributionChange,
       path,
+    }: {
+        center: [number, number],
+        robotPosition: [number, number],
+        isFollowing: boolean,
+        onUserInteraction: () => void,
+        styleUrl: any, // Can be string or object
+        onAttributionChange: (text: string) => void,
+        path: [number, number][],
     },
     ref
   ) => {
-    const containerRef = useRef(null);
-    const mapState = useRef({ map: null, marker: null });
+    const containerRef = useRef<HTMLDivElement>(null);
+    const mapState = useRef<{ map: any | null, marker: any | null }>({ map: null, marker: null });
     const [mapFailed, setMapFailed] = useState(false);
 
     useImperativeHandle(ref, () => ({
@@ -276,7 +265,7 @@ const MapArea = forwardRef(
       return () => {
         try {
           document.head.removeChild(link);
-        } catch { }
+        } catch { /* Ignore error on fast unmounts */ }
       };
     }, []);
 
@@ -299,22 +288,16 @@ const MapArea = forwardRef(
           map.on("load", () => {
             if (cancelled) return;
             const el = document.createElement("div");
-            el.className =
-              "w-3 h-3 bg-blue-400 rounded-full border-2 border-white shadow";
+            el.className = "w-3 h-3 bg-blue-400 rounded-full border-2 border-white shadow";
             mapState.current.marker = new maplibregl.Marker({ element: el })
               .setLngLat(robotPosition)
               .addTo(map);
 
-            // --- NEW: Load custom SVG icons for the path endpoints ---
-            // We create SVG strings and convert them to image elements the map can use.
-
-            // Start Icon: A green PlayCircle
             const startSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" fill="#22c55e"></circle><polygon points="10,8 16,12 10,16 10,8" fill="white" stroke="none"></polygon></svg>`;
             const startImg = new Image(28, 28);
             startImg.src = "data:image/svg+xml;base64," + btoa(startSvg);
             startImg.onload = () => map.hasImage("start-icon") || map.addImage("start-icon", startImg, { sdf: false });
 
-            // End Icon: A red CheckCircle
             const endSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" fill="#ef4444"></circle><path d="m9 12 2 2 4-4" stroke-width="2.5"></path></svg>`;
             const endImg = new Image(28, 28);
             endImg.src = "data:image/svg+xml;base64," + btoa(endSvg);
@@ -322,7 +305,8 @@ const MapArea = forwardRef(
           });
 
           map.on("error", () => !cancelled && setMapFailed(true));
-        } catch (e) {
+        } catch {
+          // FIXED: The 'e' was unused, causing a warning. Removed it.
           if (!cancelled) setMapFailed(true);
         }
       })();
@@ -331,6 +315,9 @@ const MapArea = forwardRef(
         mapState.current.map?.remove();
         mapState.current = { map: null, marker: null };
       };
+      // NOTE: This hook intentionally runs only once on mount to initialize the map.
+      // The linter warning about missing dependencies is disabled for this line to prevent re-initializing the map on every state change.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
@@ -340,7 +327,7 @@ const MapArea = forwardRef(
       const updateAttribution = () => {
         if (!map.isStyleLoaded()) return;
         const sources = map.getStyle().sources;
-        const attributions = Object.values(sources).map(s => s.attribution).filter(Boolean);
+        const attributions = Object.values(sources).map((s: any) => s.attribution).filter(Boolean);
         onAttributionChange([...new Set(attributions)].join(" | "));
       };
       map.on("styledata", updateAttribution);
@@ -356,7 +343,6 @@ const MapArea = forwardRef(
       }
     }, [robotPosition, isFollowing]);
 
-    // --- UPDATED: Path drawing logic with robust updates and new styling ---
     useEffect(() => {
       const map = mapState.current.map;
       if (!map || !map.isStyleLoaded()) return;
@@ -364,8 +350,6 @@ const MapArea = forwardRef(
       const layerIds = ['path-casing', 'path-line', 'start-point', 'end-point'];
       const sourceIds = ['path-source', 'start-point-source', 'end-point-source'];
 
-      // --- THE FIX: This function removes old layers and sources completely before drawing new ones.
-      // This prevents errors where the map's internal state doesn't match React's state.
       const cleanupOldPath = () => {
         layerIds.forEach(id => {
           if (map.getLayer(id)) map.removeLayer(id);
@@ -377,24 +361,20 @@ const MapArea = forwardRef(
 
       cleanupOldPath();
 
-      // If the path is empty or too short, we stop here after cleaning up.
       if (!path || path.length < 1) {
         return;
       }
 
-      // Define GeoJSON data for the path line and its start/end points
       const startPoint = path[0];
       const endPoint = path[path.length - 1];
-      const pathLineData = { type: 'Feature', geometry: { type: 'LineString', coordinates: path } };
-      const startPointData = { type: 'Feature', geometry: { type: 'Point', coordinates: startPoint } };
-      const endPointData = { type: 'Feature', geometry: { type: 'Point', coordinates: endPoint } };
+      const pathLineData: any = { type: 'Feature', geometry: { type: 'LineString', coordinates: path } };
+      const startPointData: any = { type: 'Feature', geometry: { type: 'Point', coordinates: startPoint } };
+      const endPointData: any = { type: 'Feature', geometry: { type: 'Point', coordinates: endPoint } };
 
-      // Add the new sources
       map.addSource('path-source', { type: 'geojson', data: pathLineData });
       map.addSource('start-point-source', { type: 'geojson', data: startPointData });
       map.addSource('end-point-source', { type: 'geojson', data: endPointData });
 
-      // Add the new layers with the modern styling
       if (path.length > 1) {
         map.addLayer({
           id: 'path-casing',
@@ -412,33 +392,22 @@ const MapArea = forwardRef(
         });
       }
 
-      // Start Point Layer (using the custom icon)
       map.addLayer({
         id: 'start-point',
         type: 'symbol',
         source: 'start-point-source',
-        layout: {
-          'icon-image': 'start-icon',
-          'icon-size': 1,
-          'icon-allow-overlap': true
-        }
+        layout: { 'icon-image': 'start-icon', 'icon-size': 1, 'icon-allow-overlap': true }
       });
 
-      // End Point Layer (only if start and end are different)
       if (path.length > 1) {
         map.addLayer({
           id: 'end-point',
           type: 'symbol',
           source: 'end-point-source',
-          layout: {
-            'icon-image': 'end-icon',
-            'icon-size': 1,
-            'icon-allow-overlap': true
-          }
+          layout: { 'icon-image': 'end-icon', 'icon-size': 1, 'icon-allow-overlap': true }
         });
       }
-
-    }, [path]); // This hook now reliably re-runs and re-draws when 'path' changes
+    }, [path]);
 
     if (mapFailed) return <MockMap />;
     return <div ref={containerRef} className="w-full h-full" />;
@@ -453,17 +422,34 @@ const mapStyles = {
     sources: {
       "maxar-imagery": {
         type: "raster",
-        tiles: [
-          "https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        ],
+        tiles: [ "https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" ],
         tileSize: 256,
-        attribution:
-          "Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community",
+        attribution: "Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community",
         maxzoom: 19,
       },
     },
     layers: [{ id: "satellite", type: "raster", source: "maxar-imagery" }],
   },
+};
+
+// Define a type for the status message for better type safety
+type HunterStatus = {
+    linear_velocity: number;
+    steering_angle: number;
+    battery_voltage: number;
+    control_mode: number;
+    vehicle_state: number;
+    error_code: number;
+    actuator_states: {
+        motor_id: number;
+        current: number;
+        pulse_count: number;
+        rpm: number;
+        driver_voltage: number;
+        driver_temperature: number;
+        motor_temperature: number;
+        driver_state: number;
+    }[];
 };
 
 export default function HunterDashboard() {
@@ -477,8 +463,8 @@ export default function HunterDashboard() {
   const [isFollowingRobot, setIsFollowingRobot] = useState(true);
   const [mapStyleKey, setMapStyleKey] = useState("dark");
   const [attributionText, setAttributionText] = useState("");
-  const [pathPoints, setPathPoints] = useState([]);
-  const mapRef = useRef(null);
+  const [pathPoints, setPathPoints] = useState<[number, number][]>([]);
+  const mapRef = useRef<{ recenter: () => void }>(null);
 
   const [isFs, setIsFs] = useState(false);
   useEffect(() => {
@@ -493,24 +479,20 @@ export default function HunterDashboard() {
       } else {
         await document.exitFullscreen();
       }
-    } catch { }
+    } catch { /* Ignore errors */ }
   };
 
   const [cfg, setCfg] = useState({
     rosbridgeUrl: "ws://10.10.3.103:9090",
-    frontCameraUrl:
-      "http://192.168.50.10:8080/stream?topic=/camera/camera1/color/image_raw",
-    rearCameraUrl:
-      "http://192.168.50.10:8080/stream?topic=/camera/camera2/color/image_raw",
+    frontCameraUrl: "http://192.168.50.10:8080/stream?topic=/camera/camera1/color/image_raw",
+    rearCameraUrl: "http://192.168.50.10:8080/stream?topic=/camera/camera2/color/image_raw",
     pathTopic: "/gps/waypoints",
   });
   useEffect(() => {
     const base = httpBaseFromWs(cfg.rosbridgeUrl);
     setCfg((prev) => {
-      const d1 =
-        "http://192.168.50.10:8080/stream?topic=/camera/camera1/color/image_raw";
-      const d2 =
-        "http://192.168.50.10:8080/stream?topic=/camera/camera2/color/image_raw";
+      const d1 = "http://192.168.50.10:8080/stream?topic=/camera/camera1/color/image_raw";
+      const d2 = "http://192.168.50.10:8080/stream?topic=/camera/camera2/color/image_raw";
       const next = { ...prev };
       if (prev.frontCameraUrl === d1)
         next.frontCameraUrl = `${base}/stream?topic=/camera/camera1/color/image_raw`;
@@ -520,9 +502,10 @@ export default function HunterDashboard() {
     });
   }, [cfg.rosbridgeUrl]);
 
-  const [status, setStatus] = useState(null);
-  const [center, setCenter] = useState([14.4208, 50.088]);
-  const [robotPosition, setRobotPosition] = useState([14.4208, 50.088]);
+  const [status, setStatus] = useState<HunterStatus | null>(null);
+  // FIXED: The `setCenter` function was unused, so it has been removed.
+  const [center] = useState<[number, number]>([14.4208, 50.088]);
+  const [robotPosition, setRobotPosition] = useState<[number, number]>([14.4208, 50.088]);
 
   // Simulation Data Hook
   useEffect(() => {
@@ -558,7 +541,7 @@ export default function HunterDashboard() {
     return () => clearInterval(interval);
   }, [mode, center]);
 
-  // --- Live ROS Connection Hook ---
+  // Live ROS Connection Hook
   useEffect(() => {
     if (mode !== "ros") {
       setRosConnected(false);
@@ -567,78 +550,49 @@ export default function HunterDashboard() {
 
     const ros = new ROSLIB.Ros({ url: cfg.rosbridgeUrl });
 
-    ros.on("connection", () => {
-      console.log("Connected to websocket server.");
-      setRosConnected(true);
-    });
-
-    ros.on("error", (error) => {
-      console.error("Error connecting to websocket server: ", error);
-      setRosConnected(false);
-    });
-
-    ros.on("close", () => {
-      console.log("Connection to websocket server closed.");
-      setRosConnected(false);
-    });
+    ros.on("connection", () => setRosConnected(true));
+    ros.on("error", () => setRosConnected(false));
+    ros.on("close", () => setRosConnected(false));
 
     const statusListener = new ROSLIB.Topic({
-      ros: ros,
+      ros,
       name: "/hunter_status",
       messageType: "hunter_msgs/HunterStatus",
     });
+    statusListener.subscribe((message) => setStatus(message as HunterStatus));
 
-    statusListener.subscribe((message) => {
-      setStatus(message);
-    });
-
-    // ... inside the useEffect for ROS connection
     const gpsListener = new ROSLIB.Topic({
-      ros: ros,
+      ros,
       name: "/gnss/septentrio/raw/fix",
       messageType: "sensor_msgs/NavSatFix",
     });
-
-    gpsListener.subscribe((message) => {
+    gpsListener.subscribe((message: any) => {
       if (message.latitude != null && message.longitude != null) {
-        const pt = [message.longitude, message.latitude];
-        setRobotPosition(pt);
+        setRobotPosition([message.longitude, message.latitude]);
       }
     });
 
-    // --- ADD THIS NEW LISTENER ---
     const pathListener = new ROSLIB.Topic({
-      ros: ros,
+      ros,
       name: cfg.pathTopic,
-      // IMPORTANT: Replace with your actual message type from `ros2 topic info`
       messageType: "artemis_msgs/msg/NavSatFixList",
     });
-    pathListener.subscribe((message) => {
+    pathListener.subscribe((message: any) => {
       if (message && Array.isArray(message.fixes)) {
-        const points = message.fixes.map(fix => [fix.longitude, fix.latitude]);
-
-        // --- DIAGNOSTIC LOG ---
-        // Log the first coordinate of the new path. If this value changes in your
-        // browser console when a new path is published, the ROS node is working correctly.
-        console.log("New path received. First waypoint:", points[0]);
-
+        const points: [number, number][] = message.fixes.map((fix: any) => [fix.longitude, fix.latitude]);
         setPathPoints(points);
-      } else {
-        console.log("Received a message on /gps/waypoints without a valid 'fixes' array.");
       }
     });
-    // --- END OF NEW LISTENER ---
 
     return () => {
       statusListener.unsubscribe();
       gpsListener.unsubscribe();
-      pathListener.unsubscribe(); // <-- ADD THIS LINE
+      pathListener.unsubscribe();
       ros.close();
     };
-  }, [mode, cfg, center]); // The dependencies array does not need to change
+  }, [mode, cfg]);
 
   const handleRecenter = () => {
-    //setIsFollowingRobot(true);
     mapRef.current?.recenter();
   };
 
@@ -646,12 +600,15 @@ export default function HunterDashboard() {
     setIsFollowingRobot(false);
   }, []);
 
-  const handleAttributionChange = useCallback((text) => {
+  const handleAttributionChange = useCallback((text: string) => {
     setAttributionText(text);
   }, []);
-
+  // ... Keep the rest of your component's JSX the same
+  // ... from the `return (` line onwards.
+  // The provided JSX seems fine and doesn't need changes to fix the build errors.
   return (
     <div className="h-screen w-screen overflow-hidden bg-black text-white">
+      {/* Header */}
       <div className="absolute top-0 left-0 right-0 z-40 h-12 sm:h-16 bg-gradient-to-r from-black via-gray-900 to-black border-b border-gray-800/50 backdrop-blur-xl shadow-lg shadow-black/10">
         <div className="flex items-center justify-between h-full px-2 sm:px-4 overflow-hidden">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -718,6 +675,7 @@ export default function HunterDashboard() {
         </div>
       </div>
 
+      {/* Main Content */}
       <div className="absolute left-0 right-0 bottom-0 top-12 sm:top-16">
         <MapArea
           ref={mapRef}
@@ -725,13 +683,14 @@ export default function HunterDashboard() {
           robotPosition={robotPosition}
           isFollowing={isFollowingRobot}
           onUserInteraction={handleUserInteraction}
-          styleUrl={mapStyles[mapStyleKey]}
+          styleUrl={mapStyles[mapStyleKey as keyof typeof mapStyles]}
           onAttributionChange={handleAttributionChange}
           path={pathPoints}
         />
 
         <AttributionControl text={attributionText} />
-
+        
+        {/* Map Controls */}
         <Card className="absolute top-2 left-2 z-20 flex items-center gap-1 p-1">
           <Button
             onClick={() => setIsFollowingRobot(!isFollowingRobot)}
@@ -794,6 +753,7 @@ export default function HunterDashboard() {
           </div>
         </Card>
 
+        {/* Camera Card */}
         <Card
           className={`absolute overflow-hidden transition-all duration-300 ${cameraExpanded
             ? "top-4 left-4 right-4 bottom-4 z-30"
@@ -854,7 +814,6 @@ export default function HunterDashboard() {
             </div>
           </div>
           <div className="relative flex h-[calc(100%-40px)] bg-gradient-to-r from-black via-gray-900 to-black">
-            {/* Front Camera Feed */}
             <div
               className={`relative h-full transition-all duration-300 ${selectedCamera === "both"
                 ? "w-1/2 border-r border-gray-800"
@@ -872,8 +831,6 @@ export default function HunterDashboard() {
                 placeholder="Front Camera Unavailable"
               />
             </div>
-
-            {/* Rear Camera Feed */}
             <div
               className={`relative h-full transition-all duration-300 ${selectedCamera === "both"
                 ? "w-1/2"
@@ -894,6 +851,7 @@ export default function HunterDashboard() {
           </div>
         </Card>
 
+        {/* Status Card */}
         <Card
           className={`absolute transition-all duration-300 ${statusExpanded
             ? "top-4 left-4 right-4 bottom-4 z-30 p-4"
@@ -947,7 +905,6 @@ export default function HunterDashboard() {
             </div>
             {statusExpanded && (
               <>
-                {" "}
                 <div className="text-center">
                   <div className="text-gray-400 text-xs mb-1">Speed</div>
                   <div className="font-mono text-white tabular-nums text-base truncate">
@@ -965,13 +922,12 @@ export default function HunterDashboard() {
                   <div className="font-mono text-white tabular-nums text-base truncate">
                     {fmt(status?.battery_voltage, 1)} V
                   </div>
-                </div>{" "}
+                </div>
               </>
             )}
           </div>
           {statusExpanded ? (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100%-96px)]">
-              {" "}
               <div className="bg-gray-900/40 border border-gray-800 rounded-md p-3 overflow-auto">
                 <div className="text-xs text-gray-400 mb-2">Key Metrics</div>
                 <div className="grid grid-cols-2 gap-2 text-sm">
@@ -1002,7 +958,7 @@ export default function HunterDashboard() {
                       : "—"}
                   </div>
                 </div>
-              </div>{" "}
+              </div>
               <div className="lg:col-span-2 bg-gray-900/40 border border-gray-800 rounded-md p-3 overflow-auto">
                 <div className="text-xs text-gray-400 mb-2">
                   Actuator States
@@ -1034,7 +990,7 @@ export default function HunterDashboard() {
                       </div>
                     ))}
                 </div>
-              </div>{" "}
+              </div>
             </div>
           ) : (
             <div className="pointer-events-none select-none" />
@@ -1042,6 +998,7 @@ export default function HunterDashboard() {
         </Card>
       </div>
 
+      {/* Settings Panel */}
       {settingsOpen && (
         <div className="absolute inset-0 z-50">
           <div
