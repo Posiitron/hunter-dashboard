@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
-    "start": "next start",
+    "export": "next build --turbopack",
+    "start": "python3 -m http.server 8080 --directory out",
     "lint": "eslint"
   },
   "dependencies": {

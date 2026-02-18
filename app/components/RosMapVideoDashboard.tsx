@@ -8,6 +8,12 @@ import React, {
   forwardRef,
   useCallback,
 } from "react";
+import type { Feature, LineString, Point } from "geojson";
+import type {
+  Map as MapLibreMap,
+  Marker as MapLibreMarker,
+  StyleSpecification,
+} from "maplibre-gl";
 import ROSLIB from "roslib";
 import {
   MapPin,
@@ -32,7 +38,11 @@ import {
 
 // --- utils ---
 // FIXED: Added explicit types to the function parameters to resolve the TypeScript error.
-function enuToLngLat(x: number, y: number, originLngLat: [number, number]) {
+function enuToLngLat(
+  x: number,
+  y: number,
+  originLngLat: [number, number]
+): [number, number] {
   const metersPerDegLat = 111_320;
   const metersPerDegLng = Math.cos((originLngLat[1] * Math.PI) / 180) * 111_320;
   return [
@@ -224,7 +234,19 @@ const AttributionControl = ({ text }: { text: string }) => {
   );
 };
 
-const MapArea = forwardRef(
+type MapStyleConfig = string | StyleSpecification;
+type MapAreaRef = { recenter: () => void };
+type MapAreaProps = {
+  center: [number, number];
+  robotPosition: [number, number];
+  isFollowing: boolean;
+  onUserInteraction: () => void;
+  styleUrl: MapStyleConfig;
+  onAttributionChange: (text: string) => void;
+  path: [number, number][];
+};
+
+const MapArea = forwardRef<MapAreaRef, MapAreaProps>(
   (
     {
       center,
@@ -234,19 +256,14 @@ const MapArea = forwardRef(
       styleUrl,
       onAttributionChange,
       path,
-    }: {
-        center: [number, number],
-        robotPosition: [number, number],
-        isFollowing: boolean,
-        onUserInteraction: () => void,
-        styleUrl: any, // Can be string or object
-        onAttributionChange: (text: string) => void,
-        path: [number, number][],
     },
     ref
   ) => {
     const containerRef = useRef<HTMLDivElement>(null);
-    const mapState = useRef<{ map: any | null, marker: any | null }>({ map: null, marker: null });
+    const mapState = useRef<{ map: MapLibreMap | null; marker: MapLibreMarker | null }>({
+      map: null,
+      marker: null,
+    });
     const [mapFailed, setMapFailed] = useState(false);
 
     useImperativeHandle(ref, () => ({
@@ -327,11 +344,15 @@ const MapArea = forwardRef(
       const updateAttribution = () => {
         if (!map.isStyleLoaded()) return;
         const sources = map.getStyle().sources;
-        const attributions = Object.values(sources).map((s: any) => s.attribution).filter(Boolean);
+        const attributions = Object.values(sources as Record<string, { attribution?: string }>)
+          .map((source) => source.attribution)
+          .filter((value): value is string => Boolean(value));
         onAttributionChange([...new Set(attributions)].join(" | "));
       };
       map.on("styledata", updateAttribution);
-      return () => map.off("styledata", updateAttribution);
+      return () => {
+        map.off("styledata", updateAttribution);
+      };
     }, [styleUrl, onAttributionChange]);
 
     useEffect(() => {
@@ -367,9 +388,21 @@ const MapArea = forwardRef(
 
       const startPoint = path[0];
       const endPoint = path[path.length - 1];
-      const pathLineData: any = { type: 'Feature', geometry: { type: 'LineString', coordinates: path } };
-      const startPointData: any = { type: 'Feature', geometry: { type: 'Point', coordinates: startPoint } };
-      const endPointData: any = { type: 'Feature', geometry: { type: 'Point', coordinates: endPoint } };
+      const pathLineData: Feature<LineString> = {
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates: path },
+        properties: null,
+      };
+      const startPointData: Feature<Point> = {
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: startPoint },
+        properties: null,
+      };
+      const endPointData: Feature<Point> = {
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: endPoint },
+        properties: null,
+      };
 
       map.addSource('path-source', { type: 'geojson', data: pathLineData });
       map.addSource('start-point-source', { type: 'geojson', data: startPointData });
@@ -414,22 +447,29 @@ const MapArea = forwardRef(
   }
 );
 MapArea.displayName = "MapArea";
-const mapStyles = {
+type MapStyleKey = "dark" | "street" | "satellite";
+
+const satelliteMapStyle: StyleSpecification = {
+  version: 8,
+  sources: {
+    "maxar-imagery": {
+      type: "raster",
+      tiles: [
+        "https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      ],
+      tileSize: 256,
+      attribution:
+        "Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community",
+      maxzoom: 19,
+    },
+  },
+  layers: [{ id: "satellite", type: "raster", source: "maxar-imagery" }],
+};
+
+const mapStyles: Record<MapStyleKey, MapStyleConfig> = {
   dark: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
   street: "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json",
-  satellite: {
-    version: 8,
-    sources: {
-      "maxar-imagery": {
-        type: "raster",
-        tiles: [ "https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" ],
-        tileSize: 256,
-        attribution: "Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community",
-        maxzoom: 19,
-      },
-    },
-    layers: [{ id: "satellite", type: "raster", source: "maxar-imagery" }],
-  },
+  satellite: satelliteMapStyle,
 };
 
 // Define a type for the status message for better type safety
@@ -452,6 +492,20 @@ type HunterStatus = {
     }[];
 };
 
+type GpsFixMessage = {
+  latitude?: number | null;
+  longitude?: number | null;
+};
+
+type PathFix = {
+  latitude?: number | null;
+  longitude?: number | null;
+};
+
+type PathFixListMessage = {
+  fixes?: PathFix[];
+};
+
 export default function HunterDashboard() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [rosConnected, setRosConnected] = useState(false);
@@ -461,7 +515,7 @@ export default function HunterDashboard() {
   const [statusExpanded, setStatusExpanded] = useState(false);
 
   const [isFollowingRobot, setIsFollowingRobot] = useState(true);
-  const [mapStyleKey, setMapStyleKey] = useState("dark");
+  const [mapStyleKey, setMapStyleKey] = useState<MapStyleKey>("dark");
   const [attributionText, setAttributionText] = useState("");
   const [pathPoints, setPathPoints] = useState<[number, number][]>([]);
   const mapRef = useRef<{ recenter: () => void }>(null);
@@ -566,7 +620,7 @@ export default function HunterDashboard() {
       name: "/gnss/septentrio/raw/fix",
       messageType: "sensor_msgs/NavSatFix",
     });
-    gpsListener.subscribe((message: any) => {
+    gpsListener.subscribe((message: GpsFixMessage) => {
       if (message.latitude != null && message.longitude != null) {
         setRobotPosition([message.longitude, message.latitude]);
       }
@@ -577,9 +631,14 @@ export default function HunterDashboard() {
       name: cfg.pathTopic,
       messageType: "artemis_msgs/msg/NavSatFixList",
     });
-    pathListener.subscribe((message: any) => {
+    pathListener.subscribe((message: PathFixListMessage) => {
       if (message && Array.isArray(message.fixes)) {
-        const points: [number, number][] = message.fixes.map((fix: any) => [fix.longitude, fix.latitude]);
+        const points: [number, number][] = message.fixes
+          .filter(
+            (fix): fix is { latitude: number; longitude: number } =>
+              fix.latitude != null && fix.longitude != null
+          )
+          .map((fix) => [fix.longitude, fix.latitude]);
         setPathPoints(points);
       }
     });
@@ -683,7 +742,7 @@ export default function HunterDashboard() {
           robotPosition={robotPosition}
           isFollowing={isFollowingRobot}
           onUserInteraction={handleUserInteraction}
-          styleUrl={mapStyles[mapStyleKey as keyof typeof mapStyles]}
+          styleUrl={mapStyles[mapStyleKey]}
           onAttributionChange={handleAttributionChange}
           path={pathPoints}
         />

@@ -1,0 +1,46 @@
+name: Build Nginx Static Package
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-static:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build static export
+        run: npm run build
+
+      - name: Create nginx-ready package
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          PKG_NAME="hunter-dashboard-nginx-${SHORT_SHA}"
+          mkdir -p dist
+          tar -czf "dist/${PKG_NAME}.tar.gz" out deploy/nginx.conf
+          echo "$PKG_NAME" > dist/package-name.txt
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hunter-dashboard-nginx
+          path: |
+            dist/*.tar.gz
+            dist/package-name.txt
+          if-no-files-found: error
