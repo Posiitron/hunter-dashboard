@@ -1,36 +1,39 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Hunter Dashboard
 
-## Getting Started
+This project is configured for static export and nginx-only runtime hosting.
 
-First, run the development server:
+## Development
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Build Static Output
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run build
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The static site is generated in `out/`.
 
-## Learn More
+## Local Static Preview
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm run start
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+This serves `out/` on `http://localhost:8080` using Python's static file server.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Deploy With Nginx
 
-## Deploy on Vercel
+1. Build on your CI/build host: `npm ci && npm run build`
+2. Copy `out/` to your nginx host, for example `/var/www/hunter-dashboard/out`
+3. Use `deploy/nginx.conf` as your server block template
+4. Reload nginx: `sudo nginx -t && sudo systemctl reload nginx`
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Notes
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Node.js is only required at build time.
+- At runtime, only nginx is required to serve static files.
+- If ROS bridge is on a private network, you can proxy websocket traffic through nginx (sample block included in `deploy/nginx.conf`).
